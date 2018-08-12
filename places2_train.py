@@ -33,13 +33,14 @@ class Places2Train (torch.utils.data.Dataset):
 		mask = Image.open(self.mask_paths[random.randint(0, self.num_masks - 1)])
 		mask = self.mask_transform(mask.convert('RGB'))
 
-		return gt_img * mask, gt_img
+		return gt_img * mask, mask, gt_img
 
 
-# Test
+# Unit Test
 if __name__ == '__main__':
 	places2 = Places2Train()
-	mix, gt = places2[0]
+	mix, mask, gt = places2[0]
+
 	mix = mix.numpy()
 	mix = mix[0, :, :]
 
