@@ -39,9 +39,9 @@ def random_dir(m, x, y, iterations, padding):
 
 
 if __name__ == '__main__':
-	image_size = 512
+	image_size = 256
 	num_masks = 1000
-	dot_size = random.randint(3, 8) * 2 + 1
+	dot_size = random.randint(1, 4)
 
 	if not os.path.exists("mask"):
 		os.makedirs("mask")
@@ -50,8 +50,8 @@ if __name__ == '__main__':
 		canvas = np.ones((image_size, image_size), np.uint8)
 		startx = random.randint(0, image_size-1)
 		starty = random.randint(0, image_size-1)
-		iterations = random.randint(2000, 6000)
-		mask = random_dir(canvas, startx, starty, iterations, (dot_size - 1) // 2)
+		iterations = random.randint(5000, 10000)
+		mask = random_dir(canvas, startx, starty, iterations, dot_size)
 
 		print("iter: {:s}\n".format(str(i)))
 		final_image = Image.fromarray(mask * 255).convert('1')

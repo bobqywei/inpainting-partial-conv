@@ -20,7 +20,7 @@ class Places2Train (torch.utils.data.Dataset):
 		self.num_masks = len(self.mask_paths)
 		self.num_imgs = len(self.img_paths)
 
-		self.img_transform = transforms.Compose([transforms.Resize((512, 512)), transforms.ToTensor(), transforms.Normalize(MEAN, STDDEV)])
+		self.img_transform = transforms.Compose([transforms.Resize((256, 256)), transforms.ToTensor(), transforms.Normalize(MEAN, STDDEV)])
 		self.mask_transform = transforms.ToTensor()
 
 	def __len__(self):
