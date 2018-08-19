@@ -17,22 +17,22 @@ def gram_matrix(feature_matrix):
 	return gram
 
 
-def perceptual_loss(h_comp, h_out, h_gt):
+def perceptual_loss(h_comp, h_out, h_gt, l1):
 	loss = 0.0
 
 	for i in range(3):
-		loss += nn.L1Loss(h_out[i], h_gt[i]) + nn.L1Loss(h_comp[i], h_gt[i])
+		loss += l1(h_out[i], h_gt[i]) + nn.L1Loss(h_comp[i], h_gt[i])
 
 	return loss
 
 
-def style_loss(h_comp, h_out, h_gt):
+def style_loss(h_comp, h_out, h_gt , l1):
 	loss_style_out = 0.0
 	loss_style_comp = 0.0
 
 	for i in range(3):
-		loss_style_out += nn.L1Loss(gram_matrix(h_out[i]), gram_matrix(h_gt[i]))
-		loss_style_comp += nn.L1Loss(gram_matrix(h_comp[i]), gram_matrix(h_gt[i]))
+		loss_style_out += l1(gram_matrix(h_out[i]), gram_matrix(h_gt[i]))
+		loss_style_comp += l1(gram_matrix(h_comp[i]), gram_matrix(h_gt[i]))
 
 	return loss_style_out + loss_style_comp
 
@@ -65,6 +65,7 @@ class CalculateLoss(nn.Module):
 	def __init__(self):
 		super().__init__()
 		self.vgg_extract = VGG16Extractor()
+		self.l1 = nn.L1Loss()
 
 	def forward(self, input, mask, output, ground_truth, log=False):
 		composited_output = (ground_truth * mask) + (output * (1 - mask))
@@ -73,10 +74,10 @@ class CalculateLoss(nn.Module):
 		fs_output = self.vgg_extract(output)
 		fs_ground_truth = self.vgg_extract(ground_truth)
 
-		loss_hole = nn.L1Loss((1 - mask) * output, (1 - mask) * ground_truth)
-		loss_valid = nn.L1Loss(mask * output, mask * ground_truth)
-		loss_perceptual = perceptual_loss(fs_composited_output, fs_output, fs_ground_truth)
-		loss_style = style_loss(fs_composited_output, fs_output, fs_ground_truth)
+		loss_hole = self.l1((1 - mask) * output, (1 - mask) * ground_truth)
+		loss_valid = self.l1(mask * output, mask * ground_truth)
+		loss_perceptual = perceptual_loss(fs_composited_output, fs_output, fs_ground_truth, self.l1)
+		loss_style = style_loss(fs_composited_output, fs_output, fs_ground_truth, self.l1)
 		loss_total_variation = total_variation_loss(fs_composited_output)
 
 		if log:
