@@ -15,7 +15,7 @@ class Places2Train (torch.utils.data.Dataset):
 	def __init__(self):
 		super(Places2Train, self).__init__()
 
-		self.img_paths = glob.glob(os.path.dirname(os.path.abspath(__file__)) + "/val_256/*.jpg")
+		self.img_paths = glob.glob(os.path.dirname(os.path.abspath(__file__)) + "/data_256/**/*.jpg", recursive=True)
 		self.mask_paths = glob.glob(os.path.dirname(os.path.abspath(__file__)) + "/mask/*.jpg")
 		self.num_masks = len(self.mask_paths)
 		self.num_imgs = len(self.img_paths)
@@ -40,6 +40,7 @@ class Places2Train (torch.utils.data.Dataset):
 if __name__ == '__main__':
 	places2 = Places2Train()
 	mix, mask, gt = places2[5]
+	print(len(places2))
 
 	mix = mix.numpy()
 	mix = mix[0, :, :]

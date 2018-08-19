@@ -48,7 +48,6 @@ class PartialConvLayer (nn.Module):
 			# Used between all decoding layers (Leaky RELU with alpha = 0.2)
 			self.activation = nn.LeakyReLU(negative_slope=0.2)
 
-
 	def forward(self, input_x, mask):
 		# output = W^T x (X .* M) + b
 		output = self.input_conv(input_x * mask)
@@ -127,15 +126,14 @@ class PartialConvUNet(nn.Module):
 		# UP(512x16x16) + 256x32x32(enc_3 output) = 768x32x32 --> 256x32x32
 		self.decoder_4 = PartialConvLayer(512 + 256, 256, activation="leaky_relu")
 
-        # UP(256x32x32) + 128x64x64(enc_2 output) = 384x64x64 --> 128x64x64
+		# UP(256x32x32) + 128x64x64(enc_2 output) = 384x64x64 --> 128x64x64
 		self.decoder_3 = PartialConvLayer(256 + 128, 128, activation="leaky_relu")
 
-        # UP(128x64x64) + 64x128x128(enc_1 output) = 192x128x128 --> 64x128x128
+		# UP(128x64x64) + 64x128x128(enc_1 output) = 192x128x128 --> 64x128x128
 		self.decoder_2 = PartialConvLayer(128 + 64, 64, activation="leaky_relu")
 
 		# UP(64x128x128) + 3x256x256(original image) = 67x256x256 --> 3x256x256(final output)
-        self.decoder_1 = PartialConvLayer(64 + 3, 3, bn=False, activation=None, bias=True)
-	
+		self.decoder_1 = PartialConvLayer(64 + 3, 3, bn=False, activation="", bias=True)
 	
 	def forward(self, input_x, mask):
 		encoder_dict = {}
@@ -172,32 +170,28 @@ class PartialConvUNet(nn.Module):
 
 		return out_data, out_mask
 
-
 	def train(self, mode=True):
-        """
-        Override the default train() to freeze the BN parameters
-        """
-        super().train(mode)
-        if self.freeze_enc_bn:
-            for name, module in self.named_modules():
-                if isinstance(module, nn.BatchNorm2d) and 'enc' in name:
-                    module.eval()
+		super().train(mode)
+		if self.freeze_enc_bn:
+			for name, module in self.named_modules():
+				if isinstance(module, nn.BatchNorm2d) and "enc" in name:
+					module.eval()
 
 
 if __name__ == '__main__':
-    size = (1, 3, 5, 5)
-    inp = torch.ones(size)
-    input_mask = torch.ones(size)
-    input_mask[:, :, 2:, :][:, :, :, 2:] = 0
+	size = (1, 3, 256, 256)
+	inp = torch.ones(size)
+	input_mask = torch.ones(size)
+	input_mask[:, :, 100:, :][:, :, :, 100:] = 0
 
-    conv = PartialConv(3, 3, 3, 1, 1)
-    l1 = nn.L1Loss()
-    inp.requires_grad = True
+	conv = PartialConvUNet()
+	l1 = nn.L1Loss()
+	inp.requires_grad = True
 
-    output, output_mask = conv(inp, input_mask)
-    loss = l1(output, torch.randn(1, 3, 5, 5))
-    loss.backward()
+	output, output_mask = conv(inp, input_mask)
+	loss = l1(output, torch.randn(1, 3, 256, 256))
+	loss.backward()
 
-    assert (torch.sum(inp.grad != inp.grad).item() == 0)
-    assert (torch.sum(torch.isnan(conv.input_conv.weight.grad)).item() == 0)
-    assert (torch.sum(torch.isnan(conv.input_conv.bias.grad)).item() == 0)
+	assert (torch.sum(inp.grad != inp.grad).item() == 0)
+	assert (torch.sum(torch.isnan(conv.decoder_1.input_conv.weight.grad)).item() == 0)
+	assert (torch.sum(torch.isnan(conv.decoder_1.input_conv.bias.grad)).item() == 0)
