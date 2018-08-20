@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torchvision import models
-from places2_train import Places2Train
+from places2_train import Places2Data
 
 LAMBDAS = {'valid': 1.0, 'hole': 6.0, 'tv': 0.1, 'perceptual': 0.05, 'style': 120.0}
 
