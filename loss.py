@@ -90,7 +90,7 @@ class CalculateLoss(nn.Module):
 
 if __name__ == '__main__':
 	extractor = VGG16Extractor()
-	places2 = Places2Train()
+	places2 = Places2Data()
 	loss = CalculateLoss()
 	img = (places2[0])[0]
 	result = extractor(img)

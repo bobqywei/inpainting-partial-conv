@@ -163,6 +163,7 @@ class PartialConvUNet(nn.Module):
 
 			# concatenate upsampled decoder output with encoder output of same H x W dimensions
 			out_data = torch.cat([out_data, encoder_dict[encoder_key]], dim=1)
+			# also concatenate the masks
 			out_mask = torch.cat([out_mask, mask_dict[encoder_key]], dim=1)
 			
 			# feed through decoder layers
