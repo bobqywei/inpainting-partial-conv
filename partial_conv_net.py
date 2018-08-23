@@ -176,6 +176,7 @@ class PartialConvUNet(nn.Module):
 		if self.freeze_enc_bn:
 			for name, module in self.named_modules():
 				if isinstance(module, nn.BatchNorm2d) and "enc" in name:
+					# Sets batch normalization layer to evaluation mode
 					module.eval()
 
 
