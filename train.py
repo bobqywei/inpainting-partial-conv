@@ -64,27 +64,27 @@ if __name__ == '__main__':
 		os.makedirs(args.out)
 
 	data_train = Places2Data(args.train_path, args.mask_path)
-	print("Loaded training dataset...\n")
+	print("Loaded training dataset...")
 
 	data_val = Places2Data(args.val_path, args.mask_path)
-	print("Loaded validation dataset...\n")
+	print("Loaded validation dataset...")
 
 	iterator_train = iter(data.DataLoader(data_train, batch_size=args.batch_size, num_workers=args.num_workers, sampler=InfiniteSampler(len(data_train))))
-	print("Configured iterator with infinite sampling over training dataset...\n")
+	print("Configured iterator with infinite sampling over training dataset...")
 
 	# Move model to gpu prior to creating optimizer, since parameters become different objects after loading
 	model = PartialConvUNet().to(device)
-	print("Loaded model to device...\n")
+	print("Loaded model to device...")
 
 	# Adam optimizer proposed in: "Adam: A Method for Stochastic Optimization"
 	# filters the model parameters for those with requires_grad == True
 	optimizer = torch.optim.Adam(filter(requires_grad, model.parameters()), lr=args.lr)
-	print("Setup Adam optimizer...\n")
+	print("Setup Adam optimizer...")
 
 	# Loss function
 	# Moves vgg16 model to gpu, used for feature map in loss function
 	loss_func = CalculateLoss().to(device)
-	print("Setup loss function...\n")
+	print("Setup loss function...")
 
 	if args.fine_tune:
 		lr = args.fine_tune_lr
