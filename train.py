@@ -52,6 +52,7 @@ if __name__ == '__main__':
 	parser.add_argument("--fine_tune", action="store_true")
 	parser.add_argument("--gpu", type=int, default=0)
 	parser.add_argument("--num_workers", type=int, default=8)
+	parser.add_argument("--log_interval", type=int, default=20)
 
 	args = parser.parse_args()
 
@@ -97,6 +98,10 @@ if __name__ == '__main__':
 
 		image, mask, gt = [x.to(device) for x in next(iterator_train)]
 		output = model(image, mask)[0]
-		loss = loss_func(image, mask, output, gt, True)
-		
+		log_loss_values = True if i % args.log_interval == 0 else False
+		loss = loss_func(image, mask, output, gt, log_loss_values)
 
+		optimizer.zero_grad()
+		loss.backward()
+		optimizer.step()
+		
