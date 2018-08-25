@@ -5,9 +5,17 @@ import glob
 import matplotlib.pyplot as plt
 from PIL import Image
 from torchvision import transforms
+from torchvision import utils
 
 MEAN = [0.485, 0.456, 0.406]
 STDDEV = [0.229, 0.224, 0.225]
+
+
+def unnormalize(x):
+	x.transpose_(1, 3)
+	x = x * torch.Tensor(STDDEV) + torch.Tensor(MEAN)
+	x.transpose_(1, 3)
+	return x
 
 
 class Places2Data (torch.utils.data.Dataset):
@@ -39,11 +47,11 @@ class Places2Data (torch.utils.data.Dataset):
 # Unit Test
 if __name__ == '__main__':
 	places2 = Places2Data()
-	mix, mask, gt = places2[5]
 	print(len(places2))
+	img, mask, gt = zip(*[places2[i] for i in range(1)]) # returns tuple of 3x256x256 images
+	img = torch.stack(img) # --> i x 3 x 256 x 256
+	mask = torch.stack(mask)
+	gt = torch.stack(gt)
 
-	mix = mix.numpy()
-	mix = mix[0, :, :]
-
-	plt.imshow(mix)
-	plt.show()
+	grid = utils.make_grid(torch.cat((unnormalize(img), mask, unnormalize(gt)), dim=0))
+	utils.save_image(grid, "test.jpg")

@@ -77,8 +77,8 @@ if __name__ == '__main__':
 	data_train = Places2Data(args.train_path, args.mask_path)
 	print("Loaded training dataset...")
 
-	data_val = Places2Data(args.val_path, args.mask_path)
-	print("Loaded validation dataset...")
+	# data_val = Places2Data(args.val_path, args.mask_path)
+	# print("Loaded validation dataset...")
 
 	iterator_train = iter(data.DataLoader(data_train, batch_size=args.batch_size, num_workers=args.num_workers, sampler=InfiniteSampler(len(data_train))))
 	print("Configured iterator with infinite sampling over training dataset...")
@@ -87,6 +87,7 @@ if __name__ == '__main__':
 	model = PartialConvUNet().to(device)
 	print("Loaded model to device...")
 
+	# Set the fine tune learning rate if necessary
 	if args.fine_tune:
 		lr = args.fine_tune_lr
 	else:
@@ -104,7 +105,9 @@ if __name__ == '__main__':
 
 	start_iter = 0
 
+	# Resume training on model
 	if args.load_model:
+		assert os.path.isfile(args.load_model)
 		print("Resume training on model: {}".format(args.load_model))
 
 		filename = args.save_dir + args.load_model
@@ -114,18 +117,20 @@ if __name__ == '__main__':
 		model.load_state_dict(checkpoint_dict["model"])
 		optimizer.load_state_dict(checkpoint_dict["optimizer"])
 
+		# Load all paramters to gpu
 		model = model.to(device)
 		for state in optimizer.state.values():
 			for key, value in state.items():
 				if isinstance(value, torch.Tensor):
 					state[key] = value.to(device)
 
-		print("Loaded model: {}".format(args.load_model))
-
+	# TRAINING LOOP
 	for i in tqdm(range(start_iter, args.max_iter)):
+
 		# Sets model to train mode
 		model.train()
 
+		# Gets the next batch of images
 		image, mask, gt = [x.to(device) for x in next(iterator_train)]
 		output = model(image, mask)
 
