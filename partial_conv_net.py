@@ -57,18 +57,18 @@ class PartialConvLayer (nn.Module):
 			# mask = (1 .* M) + 0 = M
 			output_mask = self.mask_conv(mask)
 
-		if self.mask_conv.bias is not None:
+		if self.input_conv.bias is not None:
 			# spreads existing bias values out along 2nd dimension (channels) and then expands to output size
-			output_bias = self.feature_conv.bias.view(1, -1, 1, 1).expand_as(output)
+			output_bias = self.input_conv.bias.view(1, -1, 1, 1).expand_as(output)
 		else:
 			output_bias = torch.zeros_like(output)
 
-		# mask_sum is the sum of the binary mask at every partial_conv location
+		# mask_sum is the sum of the binary mask at every partial convolution location
 		mask_is_zero = (output_mask == 0)
 		mask_sum = output_mask.masked_fill_(mask_is_zero, 1.0)
 
 		# output at each location as follows:
-		# output = (W^T x (X .* M)) / M_sum + b ; if M_sum > 0
+		# output = (W^T x (X .* M) + b - b) / M_sum + b ; if M_sum > 0
 		# output = 0 ; if M_sum == 0
 		output = (output - output_bias) / mask_sum + output_bias
 		output = output.masked_fill_(mask_is_zero, 0.0)
@@ -169,7 +169,7 @@ class PartialConvUNet(nn.Module):
 			# feed through decoder layers
 			out_data, out_mask = getattr(self, decoder_key)(out_data, out_mask)
 
-		return out_data, out_mask
+		return out_data
 
 	def train(self, mode=True):
 		super().train(mode)
@@ -190,7 +190,7 @@ if __name__ == '__main__':
 	l1 = nn.L1Loss()
 	inp.requires_grad = True
 
-	output, output_mask = conv(inp, input_mask)
+	output = conv(inp, input_mask)
 	loss = l1(output, torch.randn(1, 3, 256, 256))
 	loss.backward()
 

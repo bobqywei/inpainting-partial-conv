@@ -3,7 +3,7 @@ import torch.nn as nn
 from torchvision import models
 from places2_train import Places2Data
 
-LAMBDAS = {'valid': 1.0, 'hole': 6.0, 'tv': 0.1, 'perceptual': 0.05, 'style': 120.0}
+LAMBDAS = {"valid": 1.0, "hole": 6.0, "tv": 0.1, "perceptual": 0.05, "style": 120.0}
 
 
 def gram_matrix(feature_matrix):
@@ -21,12 +21,12 @@ def perceptual_loss(h_comp, h_out, h_gt, l1):
 	loss = 0.0
 
 	for i in range(3):
-		loss += l1(h_out[i], h_gt[i]) + nn.L1Loss(h_comp[i], h_gt[i])
+		loss += l1(h_out[i], h_gt[i]) + l1(h_comp[i], h_gt[i])
 
 	return loss
 
 
-def style_loss(h_comp, h_out, h_gt , l1):
+def style_loss(h_comp, h_out, h_gt, l1):
 	loss_style_out = 0.0
 	loss_style_comp = 0.0
 
@@ -37,8 +37,8 @@ def style_loss(h_comp, h_out, h_gt , l1):
 	return loss_style_out + loss_style_comp
 
 
-def total_variation_loss(I_comp):
-	return nn.L1Loss(I_comp[:, :, :, :-1], I_comp[:, :, :, 1:]) + nn.L1Loss(I_comp[:, :, :-1, :], I_comp[:, :, 1:, :])
+def total_variation_loss(I_comp, l1):
+	return l1(I_comp[:, :, :, :-1], I_comp[:, :, :, 1:]) + l1(I_comp[:, :, :-1, :], I_comp[:, :, 1:, :])
 
 
 class VGG16Extractor(nn.Module):
@@ -67,31 +67,34 @@ class CalculateLoss(nn.Module):
 		self.vgg_extract = VGG16Extractor()
 		self.l1 = nn.L1Loss()
 
-	def forward(self, input, mask, output, ground_truth, log=False):
+	def forward(self, input, mask, output, ground_truth):
 		composited_output = (ground_truth * mask) + (output * (1 - mask))
 
 		fs_composited_output = self.vgg_extract(composited_output)
 		fs_output = self.vgg_extract(output)
 		fs_ground_truth = self.vgg_extract(ground_truth)
 
-		loss_hole = self.l1((1 - mask) * output, (1 - mask) * ground_truth)
-		loss_valid = self.l1(mask * output, mask * ground_truth)
-		loss_perceptual = perceptual_loss(fs_composited_output, fs_output, fs_ground_truth, self.l1)
-		loss_style = style_loss(fs_composited_output, fs_output, fs_ground_truth, self.l1)
-		loss_total_variation = total_variation_loss(fs_composited_output)
+		loss_dict = dict()
 
-		if log:
-			format_log = 'hole: {:f} | valid: {:f} | perceptual: {:f} | style: {:f} | tv: {:f}\n'
-			print(format_log.format(loss_hole, loss_valid, loss_perceptual, loss_style, loss_total_variation))
+		loss_dict["hole"] = self.l1((1 - mask) * output, (1 - mask) * ground_truth) * LAMBDAS["hole"]
+		loss_dict["valid"] = self.l1(mask * output, mask * ground_truth) * LAMBDAS["valid"]
+		loss_dict["perceptual"] = perceptual_loss(fs_composited_output, fs_output, fs_ground_truth, self.l1) * LAMBDAS["perceptual"]
+		loss_dict["style"] = style_loss(fs_composited_output, fs_output, fs_ground_truth, self.l1) * LAMBDAS["style"]
+		loss_dict["tv"] = total_variation_loss(composited_output, self.l1) * LAMBDAS["tv"]
 
-		return LAMBDAS['valid'] * loss_valid + LAMBDAS['hole'] * loss_hole + LAMBDAS['perceptual'] * loss_perceptual \
-			+ LAMBDAS['style'] * loss_style + LAMBDAS['tv'] * loss_total_variation
+		return loss_dict
 
 
 if __name__ == '__main__':
-	extractor = VGG16Extractor()
 	places2 = Places2Data()
-	loss = CalculateLoss()
-	img = (places2[0])[0]
-	result = extractor(img)
-	print(result[0].size())
+	loss_func = CalculateLoss()
+
+	img, mask, gt = places2[5]
+	img.unsqueeze_(0)
+	mask.unsqueeze_(0)
+	gt.unsqueeze_(0)
+
+	loss_out = loss_func(img, mask, img, gt)
+
+	for key, value in loss_out.items():
+		print("KEY:{} | VALUE:{}".format(key, value))
