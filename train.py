@@ -12,27 +12,16 @@ from partial_conv_net import PartialConvUNet
 from places2_train import Places2Data
 
 
-# https://github.com/naoto0804/pytorch-inpainting-with-partial-conv/blob/master/train.py
-class InfiniteSampler(data.sampler.Sampler):
-	def __init__(self, num_samples):
+class SubsetSampler(data.sampler.Sampler):
+	def __init__(self, start_sample, num_samples):
 		self.num_samples = num_samples
+		self.start_sample = start_sample
 
 	def __iter__(self):
-		return iter(self.loop())
+		return iter(range(self.start_sample, self.num_samples))
 
 	def __len__(self):
-		return 2 ** 31
-
-	def loop(self):
-		i = 0
-		order = np.random.permutation(self.num_samples)
-		while True:
-			yield order[i]
-			i += 1
-			if i >= self.num_samples:
-				np.random.seed()
-				order = np.random.permutation(self.num_samples)
-				i = 0
+		return self.num_samples
 
 
 def requires_grad(param):
@@ -51,8 +40,8 @@ if __name__ == '__main__':
 
 	parser.add_argument("--lr", type=float, default=2e-4)
 	parser.add_argument("--fine_tune_lr", type=float, default=5e-5)
-	parser.add_argument("--batch_size", type=int, default=8)
-	parser.add_argument("--max_iter", type=int, default=500000)
+	parser.add_argument("--batch_size", type=int, default=10)
+	parser.add_argument("--epochs", type=int, default=3)
 	parser.add_argument("--fine_tune", action="store_true")
 	parser.add_argument("--gpu", type=int, default=0)
 	parser.add_argument("--num_workers", type=int, default=8)
@@ -75,13 +64,14 @@ if __name__ == '__main__':
 		device = torch.device("cpu")
 
 	data_train = Places2Data(args.train_path, args.mask_path)
-	print("Loaded training dataset...")
+	data_size = len(data_train)
+	print("Loaded training dataset with {} samples".format(data_size))
+
+	assert(data_size % args.batch_size == 0)
+	iters_per_epoch = data_size // args.batch_size
 
 	# data_val = Places2Data(args.val_path, args.mask_path)
 	# print("Loaded validation dataset...")
-
-	iterator_train = iter(data.DataLoader(data_train, batch_size=args.batch_size, num_workers=args.num_workers, sampler=InfiniteSampler(len(data_train))))
-	print("Configured iterator with infinite sampling over training dataset...")
 
 	# Move model to gpu prior to creating optimizer, since parameters become different objects after loading
 	model = PartialConvUNet().to(device)
@@ -104,51 +94,61 @@ if __name__ == '__main__':
 	print("Setup loss function...")
 
 	start_iter = 0
-
+	start_epoch = 0
 	# Resume training on model
 	if args.load_model:
 		assert os.path.isfile(args.load_model)
-		print("Resume training on model: {}".format(args.load_model))
 
 		filename = args.save_dir + args.load_model
 		checkpoint_dict = torch.load(filename)
 		start_iter = checkpoint_dict["iteration"]
+		start_epoch = checkpoint_dict["epoch"]
 
 		model.load_state_dict(checkpoint_dict["model"])
 		optimizer.load_state_dict(checkpoint_dict["optimizer"])
 
-		# Load all paramters to gpu
+		print("Resume training on model:{} from epoch:{}, iteration:{}".format(args.load_model, start_epoch, start_iter))
+
+		# Load all parameters to gpu
 		model = model.to(device)
 		for state in optimizer.state.values():
 			for key, value in state.items():
 				if isinstance(value, torch.Tensor):
 					state[key] = value.to(device)
 
-	# TRAINING LOOP
-	for i in tqdm(range(start_iter, args.max_iter)):
+	for epoch in range(start_epoch, args.epochs):
 
-		# Sets model to train mode
-		model.train()
+		iterator_train = iter(data.DataLoader(data_train, 
+											batch_size=args.batch_size, 
+											num_workers=args.num_workers, 
+											sampler=SubsetSampler(start_iter * args.batch_size, data_size)))
 
-		# Gets the next batch of images
-		image, mask, gt = [x.to(device) for x in next(iterator_train)]
-		output = model(image, mask)
+		# TRAINING LOOP
+		print("\nEPOCH:{} of {} - starting training loop from iteration:{} to iteration:{}\n".format(epoch, args.epochs, start_iter, iters_per_epoch))
+		for i in tqdm(range(start_iter, iters_per_epoch)):
 
-		loss_dict = loss_func(image, mask, output, gt)
-		loss = 0.0
+			# Sets model to train mode
+			model.train()
 
-		for key, value in loss_dict.items():
-			loss += value
-			if i % args.log_interval == 0:
-				writer.add_scalar(key, value.item(), i + 1)
+			# Gets the next batch of images
+			image, mask, gt = [x.to(device) for x in next(iterator_train)]
+			output = model(image, mask)
 
-		optimizer.zero_grad()
-		loss.backward()
-		optimizer.step()
+			loss_dict = loss_func(image, mask, output, gt)
+			loss = 0.0
 
-		if i % args.save_interval == 0 or i + 1 == args.max_iter:
-			filename = args.save_dir + "/model{}.pth".format(i + 1)
-			state = {"iteration": i + 1, "model": model.state_dict(), "optimizer": optimizer.state_dict()}
-			torch.save(state, filename)
+			for key, value in loss_dict.items():
+				loss += value
+				if i % args.log_interval == 0:
+					writer.add_scalar(key, value.item(), i + 1)
+
+			optimizer.zero_grad()
+			loss.backward()
+			optimizer.step()
+
+			if i % args.save_interval == 0 or i + 1 == iters_per_epoch:
+				filename = args.save_dir + "/model{}.pth".format(i + 1)
+				state = {"epoch": epoch, "iteration": i + 1, "model": model.state_dict(), "optimizer": optimizer.state_dict()}
+				torch.save(state, filename)
 
 	writer.close()

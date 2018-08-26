@@ -50,6 +50,8 @@ if __name__ == '__main__':
 	print(len(places2))
 	img, mask, gt = zip(*[places2[i] for i in range(1)]) # returns tuple of 3x256x256 images
 	img = torch.stack(img) # --> i x 3 x 256 x 256
+	i = img == 0
+	print(i.sum())
 	mask = torch.stack(mask)
 	gt = torch.stack(gt)
 

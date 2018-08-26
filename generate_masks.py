@@ -50,7 +50,7 @@ if __name__ == '__main__':
 		canvas = np.ones((image_size, image_size), np.uint8)
 		startx = random.randint(0, image_size-1)
 		starty = random.randint(0, image_size-1)
-		iterations = random.randint(5000, 10000)
+		iterations = random.randint(7000, 10000)
 		mask = random_dir(canvas, startx, starty, iterations, dot_size)
 
 		print("iter: {:s}\n".format(str(i)))
