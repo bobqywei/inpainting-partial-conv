@@ -40,21 +40,23 @@ if __name__ == '__main__':
 
 	parser.add_argument("--lr", type=float, default=2e-4)
 	parser.add_argument("--fine_tune_lr", type=float, default=5e-5)
-	parser.add_argument("--batch_size", type=int, default=10)
+	parser.add_argument("--batch_size", type=int, default=32)
 	parser.add_argument("--epochs", type=int, default=3)
 	parser.add_argument("--fine_tune", action="store_true")
 	parser.add_argument("--gpu", type=int, default=0)
-	parser.add_argument("--num_workers", type=int, default=8)
-	parser.add_argument("--log_interval", type=int, default=10)
-	parser.add_argument("--save_interval", type=int, default=5)
+	parser.add_argument("--num_workers", type=int, default=16)
+	parser.add_argument("--log_interval", type=int, default=100)
+	parser.add_argument("--save_interval", type=int, default=100)
 
 	args = parser.parse_args()
 
-	if not os.path.exists(args.log_dir):
-		os.makedirs(args.log_dir)
+	cwd = os.getcwd()
 
-	if not os.path.exists(args.save_dir):
-		os.makedirs(args.save_dir)
+	if not os.path.exists(cwd + args.log_dir):
+		os.makedirs(cwd + args.log_dir)
+
+	if not os.path.exists(cwd + args.save_dir):
+		os.makedirs(cwd + args.save_dir)
 
 	writer = SummaryWriter(args.log_dir)
 
@@ -97,9 +99,9 @@ if __name__ == '__main__':
 	start_epoch = 0
 	# Resume training on model
 	if args.load_model:
-		assert os.path.isfile(args.load_model)
+		assert os.path.isfile(cwd + args.save_dir + args.load_model)
 
-		filename = args.save_dir + args.load_model
+		filename = cwd + args.save_dir + args.load_model
 		checkpoint_dict = torch.load(filename)
 		start_iter = checkpoint_dict["iteration"]
 		start_epoch = checkpoint_dict["epoch"]
@@ -147,7 +149,7 @@ if __name__ == '__main__':
 			optimizer.step()
 
 			if i % args.save_interval == 0 or i + 1 == iters_per_epoch:
-				filename = args.save_dir + "/model{}.pth".format(i + 1)
+				filename = cwd + args.save_dir + "/model{}.pth".format(i + 1)
 				state = {"epoch": epoch, "iteration": i + 1, "model": model.state_dict(), "optimizer": optimizer.state_dict()}
 				torch.save(state, filename)
 
