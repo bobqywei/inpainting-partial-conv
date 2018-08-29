@@ -45,8 +45,8 @@ if __name__ == '__main__':
 	parser.add_argument("--fine_tune", action="store_true")
 	parser.add_argument("--gpu", type=int, default=0)
 	parser.add_argument("--num_workers", type=int, default=16)
-	parser.add_argument("--log_interval", type=int, default=10)
-	parser.add_argument("--save_interval", type=int, default=100)
+	parser.add_argument("--log_interval", type=int, default=50)
+	parser.add_argument("--save_interval", type=int, default=1000)
 
 	args = parser.parse_args()
 
@@ -143,8 +143,8 @@ if __name__ == '__main__':
 			# sums up each loss value
 			for key, value in loss_dict.items():
 				loss += value
-				if i % args.log_interval == 0:
-					writer.add_scalar(key, value.item(), i + 1)
+				if (i + 1) % args.log_interval == 0:
+					writer.add_scalar(key, value.item(), (epoch * iters_per_epoch) + i + 1)
 
 			# Resets gradient accumulator in optimizer
 			optimizer.zero_grad()
@@ -154,12 +154,8 @@ if __name__ == '__main__':
 			optimizer.step()
 
 			# Save model
-			if i + 1 == iters_per_epoch:
-				filename = cwd + args.save_dir + "/model_epoch{}.pth".format(epoch)
-				state = {"epoch": epoch, "iteration": i + 1, "model": model.state_dict(), "optimizer": optimizer.state_dict()}
-				torch.save(state, filename)
-			elif i % args.save_interval == 0:
-				filename = cwd + args.save_dir + "/model{}.pth".format(i + 1)
+			if (i + 1) % args.save_interval == 0 or (i + 1) == iters_per_epoch:
+				filename = cwd + args.save_dir + "/model_e{}_i{}.pth".format(epoch, i + 1)
 				state = {"epoch": epoch, "iteration": i + 1, "model": model.state_dict(), "optimizer": optimizer.state_dict()}
 				torch.save(state, filename)
 
