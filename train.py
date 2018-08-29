@@ -45,20 +45,21 @@ if __name__ == '__main__':
 	parser.add_argument("--fine_tune", action="store_true")
 	parser.add_argument("--gpu", type=int, default=0)
 	parser.add_argument("--num_workers", type=int, default=16)
-	parser.add_argument("--log_interval", type=int, default=100)
+	parser.add_argument("--log_interval", type=int, default=10)
 	parser.add_argument("--save_interval", type=int, default=100)
 
 	args = parser.parse_args()
 
 	cwd = os.getcwd()
 
+	#Tensorboard SummaryWriter setup
 	if not os.path.exists(cwd + args.log_dir):
 		os.makedirs(cwd + args.log_dir)
 
+	writer = SummaryWriter(cwd + args.log_dir)
+
 	if not os.path.exists(cwd + args.save_dir):
 		os.makedirs(cwd + args.save_dir)
-
-	writer = SummaryWriter(args.log_dir)
 
 	if args.gpu >= 0:
 		device = torch.device("cuda:{}".format(args.gpu))
@@ -138,19 +139,32 @@ if __name__ == '__main__':
 
 			loss_dict = loss_func(image, mask, output, gt)
 			loss = 0.0
-
+			
+			# sums up each loss value
 			for key, value in loss_dict.items():
 				loss += value
 				if i % args.log_interval == 0:
 					writer.add_scalar(key, value.item(), i + 1)
 
+			# Resets gradient accumulator in optimizer
 			optimizer.zero_grad()
+			# back-propogates gradients through model weights
 			loss.backward()
+			# updates the weights
 			optimizer.step()
 
-			if i % args.save_interval == 0 or i + 1 == iters_per_epoch:
+			# Save model
+			if i + 1 == iters_per_epoch:
+				filename = cwd + args.save_dir + "/model_epoch{}.pth".format(epoch)
+				state = {"epoch": epoch, "iteration": i + 1, "model": model.state_dict(), "optimizer": optimizer.state_dict()}
+				torch.save(state, filename)
+			elif i % args.save_interval == 0:
 				filename = cwd + args.save_dir + "/model{}.pth".format(i + 1)
 				state = {"epoch": epoch, "iteration": i + 1, "model": model.state_dict(), "optimizer": optimizer.state_dict()}
 				torch.save(state, filename)
 
+		# Reset start iteration if model was loaded
+		start_iter = 0
+
 	writer.close()
+	print("Tensorboard-summary-writer closed. Training complete.")
