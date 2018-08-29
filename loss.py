@@ -1,7 +1,11 @@
 import torch
+import os
 import torch.nn as nn
+
 from torchvision import models
-from places2_train import Places2Data
+from torchvision import transforms
+from places2_train import Places2Data, MEAN, STDDEV
+from PIL import Image
 
 LAMBDAS = {"valid": 1.0, "hole": 6.0, "tv": 0.1, "perceptual": 0.05, "style": 120.0}
 
@@ -45,9 +49,9 @@ class VGG16Extractor(nn.Module):
 	def __init__(self):
 		super().__init__()
 		vgg16 = models.vgg16(pretrained=True)
-		self.max_pooling1 = nn.Sequential(vgg16.features[4])
-		self.max_pooling2 = nn.Sequential(vgg16.features[9])
-		self.max_pooling3 = nn.Sequential(vgg16.features[16])
+		self.max_pooling1 = nn.Sequential(vgg16.features[:5])
+		self.max_pooling2 = nn.Sequential(vgg16.features[5:10])
+		self.max_pooling3 = nn.Sequential(vgg16.features[10:17])
 
 		for i in range(1, 4):
 			for param in getattr(self, 'max_pooling{:d}'.format(i)).parameters():
@@ -86,10 +90,20 @@ class CalculateLoss(nn.Module):
 
 
 if __name__ == '__main__':
-	places2 = Places2Data()
+	#places2 = Places2Data()
+	cwd = os.getcwd()
 	loss_func = CalculateLoss()
 
-	img, mask, gt = places2[5]
+	gt = Image.open(cwd + "/test_256/Places365_test_00000050.jpg")
+	mask = Image.open(cwd + "/mask/mask_512.jpg")
+
+	img_transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize(MEAN, STDDEV)])
+	mask_transform = transforms.ToTensor()
+
+	gt = img_transform(gt.convert("RGB"))
+	mask = img_transform(mask.convert("RGB"))
+	img = gt * mask
+
 	img.unsqueeze_(0)
 	mask.unsqueeze_(0)
 	gt.unsqueeze_(0)
