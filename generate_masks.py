@@ -38,22 +38,45 @@ def random_dir(m, x, y, iterations, padding):
 	return m
 
 
+def random_dir(m, x, y, iterations):
+	img_size = m.shape[0]
+
+	for j in range(iterations):
+		direction = random.randint(0, 3)
+
+		if direction == 0:
+			x -= 1
+		elif direction == 1:
+			x += 1
+		elif direction == 2:
+			y -= 1
+		else:
+			y += 1
+
+		x = clip_bounds(x, 0, img_size)
+		y = clip_bounds(y, 0, img_size)
+
+		m[x, y] = 0
+
+	return m
+
+
 if __name__ == '__main__':
 	image_size = 256
 	num_masks = 1000
-	dot_size = random.randint(1, 4)
+	# dot_size = random.randint(1, 4)
 
 	if not os.path.exists("mask"):
 		os.makedirs("mask")
 
 	for i in range(num_masks):
 		canvas = np.ones((image_size, image_size), np.uint8)
-		startx = random.randint(0, image_size-1)
-		starty = random.randint(0, image_size-1)
-		iterations = random.randint(7000, 10000)
-		mask = random_dir(canvas, startx, starty, iterations, dot_size)
+		startx = random.randint(50, image_size-51)
+		starty = random.randint(50, image_size-51)
+		iterations = image_size * image_size # random.randint(7000, 10000)
+		mask = random_dir(canvas, startx, starty, iterations)
 
 		print("iter: {:s}\n".format(str(i)))
 		final_image = Image.fromarray(mask * 255).convert('1')
 		final_image.save("mask/mask_{:d}.jpg".format(i))
-
+		
