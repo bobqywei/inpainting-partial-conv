@@ -41,17 +41,27 @@ def style_loss(h_comp, h_out, h_gt, l1):
 	return loss_style_out + loss_style_comp
 
 
-def total_variation_loss(I_comp, l1):
-	return l1(I_comp[:, :, :, :-1], I_comp[:, :, :, 1:]) + l1(I_comp[:, :, :-1, :], I_comp[:, :, 1:, :])
+def total_variation_loss(I_comp, mask, l1):
+	canvas = mask.data
+	canvas[:,:,:,:-1] += mask.data[:,:,:,1:] #mask left overlap
+	canvas[:,:,:,1:] += mask.data[:,:,:,:-1] #mask right overlap
+	canvas[:,:,:-1,:] += mask.data[:,:,1:,:] #mask up overlap
+	canvas[:,:,1:,:] += mask.data[:,:,:-1,:] #mask bottom overlap
+
+	mask_not_zero = (canvas != 0)
+	P = canvas.masked_fill_(mask_not_zero, 1.0)
+
+	return l1(P[:, :, :, :-1] * I_comp[:, :, :, :-1], P[:, :, :, 1:] * I_comp[:, :, :, 1:]) + \
+		l1(P[:, :, :-1, :] * I_comp[:, :, :-1, :], P[:, :, 1:, :] * I_comp[:, :, 1:, :])
 
 
 class VGG16Extractor(nn.Module):
 	def __init__(self):
 		super().__init__()
 		vgg16 = models.vgg16(pretrained=True)
-		self.max_pooling1 = nn.Sequential(vgg16.features[:5])
-		self.max_pooling2 = nn.Sequential(vgg16.features[5:10])
-		self.max_pooling3 = nn.Sequential(vgg16.features[10:17])
+		self.max_pooling1 = nn.Sequential(vgg16.features[4])
+		self.max_pooling2 = nn.Sequential(vgg16.features[9])
+		self.max_pooling3 = nn.Sequential(vgg16.features[16])
 
 		for i in range(1, 4):
 			for param in getattr(self, 'max_pooling{:d}'.format(i)).parameters():
@@ -71,7 +81,7 @@ class CalculateLoss(nn.Module):
 		self.vgg_extract = VGG16Extractor()
 		self.l1 = nn.L1Loss()
 
-	def forward(self, input, mask, output, ground_truth):
+	def forward(self, mask, output, ground_truth):
 		composited_output = (ground_truth * mask) + (output * (1 - mask))
 
 		fs_composited_output = self.vgg_extract(composited_output)
@@ -84,7 +94,7 @@ class CalculateLoss(nn.Module):
 		loss_dict["valid"] = self.l1(mask * output, mask * ground_truth) * LAMBDAS["valid"]
 		loss_dict["perceptual"] = perceptual_loss(fs_composited_output, fs_output, fs_ground_truth, self.l1) * LAMBDAS["perceptual"]
 		loss_dict["style"] = style_loss(fs_composited_output, fs_output, fs_ground_truth, self.l1) * LAMBDAS["style"]
-		loss_dict["tv"] = total_variation_loss(composited_output, self.l1) * LAMBDAS["tv"]
+		loss_dict["tv"] = total_variation_loss(composited_output, mask, self.l1) * LAMBDAS["tv"]
 
 		return loss_dict
 
@@ -108,7 +118,7 @@ if __name__ == '__main__':
 	mask.unsqueeze_(0)
 	gt.unsqueeze_(0)
 
-	loss_out = loss_func(img, mask, img, gt)
+	loss_out = loss_func(mask, img, gt)
 
 	for key, value in loss_out.items():
 		print("KEY:{} | VALUE:{}".format(key, value))
