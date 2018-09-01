@@ -17,9 +17,10 @@ def gram_matrix(feature_matrix):
 	feature_matrix_t = feature_matrix.transpose(1, 2)
 
 	# batch matrix multiplication * normalization factor K_n
+	# (batch, channel, h * w) x (batch, h * w, channel) ==> (batch, channel, channel)
 	gram = torch.bmm(feature_matrix, feature_matrix_t) / (channel * h * w)
 
-	# size = (batch, channel, h * w)
+	# size = (batch, channel, channel)
 	return gram
 
 
