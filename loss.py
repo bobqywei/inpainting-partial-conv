@@ -1,6 +1,7 @@
 import torch
 import os
 import torch.nn as nn
+import numpy as np
 
 from torchvision import models
 from torchvision import transforms
@@ -18,50 +19,57 @@ def gram_matrix(feature_matrix):
 	# batch matrix multiplication * normalization factor K_n
 	gram = torch.bmm(feature_matrix, feature_matrix_t) / (channel * h * w)
 
+	# size = (batch, channel, h * w)
 	return gram
 
 
 def perceptual_loss(h_comp, h_out, h_gt, l1):
 	loss = 0.0
 
-	for i in range(3):
-		loss += l1(h_out[i], h_gt[i]) + l1(h_comp[i], h_gt[i])
+	for i in range(len(h_comp)):
+		loss += l1(h_out[i], h_gt[i])
+		loss += l1(h_comp[i], h_gt[i])
 
 	return loss
 
 
 def style_loss(h_comp, h_out, h_gt, l1):
-	loss_style_out = 0.0
-	loss_style_comp = 0.0
+	loss = 0.0
 
-	for i in range(3):
-		loss_style_out += l1(gram_matrix(h_out[i]), gram_matrix(h_gt[i]))
-		loss_style_comp += l1(gram_matrix(h_comp[i]), gram_matrix(h_gt[i]))
+	for i in range(len(h_comp)):
+		loss += l1(gram_matrix(h_out[i]), gram_matrix(h_gt[i]))
+		loss += l1(gram_matrix(h_comp[i]), gram_matrix(h_gt[i]))
 
-	return loss_style_out + loss_style_comp
+	return loss
 
 
-def total_variation_loss(I_comp, mask, l1):
+"""def total_variation_loss(image, mask):
 	canvas = mask.data
 	canvas[:,:,:,:-1] += mask.data[:,:,:,1:] #mask left overlap
 	canvas[:,:,:,1:] += mask.data[:,:,:,:-1] #mask right overlap
 	canvas[:,:,:-1,:] += mask.data[:,:,1:,:] #mask up overlap
 	canvas[:,:,1:,:] += mask.data[:,:,:-1,:] #mask bottom overlap
 
-	mask_not_zero = (canvas != 0)
-	P = canvas.masked_fill_(mask_not_zero, 1.0)
+	P = (torch.sign(canvas - 0.5) + 1) * 0.5
+	
+	loss = torch.mean(torch.abs(P[:, :, :, :-1]*image[:, :, :, :-1] - P[:, :, :, 1:]*image[:, :, :, 1:])) + torch.mean(torch.abs(P[:, :, :-1, :]*image[:, :, :-1, :] - P[:, :, 1:, :]*image[:, :, 1:, :]))
+	return loss"""
 
-	return l1(P[:, :, :, :-1] * I_comp[:, :, :, :-1], P[:, :, :, 1:] * I_comp[:, :, :, 1:]) + \
-		l1(P[:, :, :-1, :] * I_comp[:, :, :-1, :], P[:, :, 1:, :] * I_comp[:, :, 1:, :])
+
+def total_variation_loss(image):
+    # shift one pixel and get difference (for both x and y direction)
+    loss = torch.mean(torch.abs(image[:, :, :, :-1] - image[:, :, :, 1:])) + \
+           torch.mean(torch.abs(image[:, :, :-1, :] - image[:, :, 1:, :]))
+    return loss
 
 
 class VGG16Extractor(nn.Module):
 	def __init__(self):
 		super().__init__()
 		vgg16 = models.vgg16(pretrained=True)
-		self.max_pooling1 = nn.Sequential(vgg16.features[4])
-		self.max_pooling2 = nn.Sequential(vgg16.features[9])
-		self.max_pooling3 = nn.Sequential(vgg16.features[16])
+		self.max_pooling1 = vgg16.features[:5]
+		self.max_pooling2 = vgg16.features[5:10]
+		self.max_pooling3 = vgg16.features[10:17]
 
 		for i in range(1, 4):
 			for param in getattr(self, 'max_pooling{:d}'.format(i)).parameters():
@@ -94,7 +102,7 @@ class CalculateLoss(nn.Module):
 		loss_dict["valid"] = self.l1(mask * output, mask * ground_truth) * LAMBDAS["valid"]
 		loss_dict["perceptual"] = perceptual_loss(fs_composited_output, fs_output, fs_ground_truth, self.l1) * LAMBDAS["perceptual"]
 		loss_dict["style"] = style_loss(fs_composited_output, fs_output, fs_ground_truth, self.l1) * LAMBDAS["style"]
-		loss_dict["tv"] = total_variation_loss(composited_output, mask, self.l1) * LAMBDAS["tv"]
+		loss_dict["tv"] = total_variation_loss(composited_output, mask) * LAMBDAS["tv"]
 
 		return loss_dict
 

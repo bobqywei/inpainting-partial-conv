@@ -24,7 +24,7 @@ class Places2Data (torch.utils.data.Dataset):
 		super().__init__()
 
 		self.img_paths = glob.glob(os.path.dirname(os.path.abspath(__file__)) + path_to_data + "/**/*.jpg", recursive=True)
-		self.mask_paths = glob.glob(os.path.dirname(os.path.abspath(__file__)) + path_to_mask + "/*.jpg")
+		self.mask_paths = glob.glob(os.path.dirname(os.path.abspath(__file__)) + path_to_mask + "/*.png")
 		self.num_masks = len(self.mask_paths)
 		self.num_imgs = len(self.img_paths)
 

@@ -45,7 +45,7 @@ if __name__ == '__main__':
 	parser.add_argument("--fine_tune", action="store_true")
 	parser.add_argument("--gpu", type=int, default=0)
 	parser.add_argument("--num_workers", type=int, default=32)
-	parser.add_argument("--log_interval", type=int, default=1000)
+	parser.add_argument("--log_interval", type=int, default=50)
 	parser.add_argument("--save_interval", type=int, default=5000)
 
 	args = parser.parse_args()
@@ -68,7 +68,7 @@ if __name__ == '__main__':
 
 	data_train = Places2Data(args.train_path, args.mask_path)
 	data_size = len(data_train)
-	print("Loaded training dataset with {} samples".format(data_size))
+	print("Loaded training dataset with {} samples and {} masks".format(data_size, data_train.num_masks))
 
 	assert(data_size % args.batch_size == 0)
 	iters_per_epoch = data_size // args.batch_size
@@ -83,6 +83,7 @@ if __name__ == '__main__':
 	# Set the fine tune learning rate if necessary
 	if args.fine_tune:
 		lr = args.fine_tune_lr
+		model.freeze_enc_bn = True
 	else:
 		lr = args.lr
 
@@ -96,21 +97,17 @@ if __name__ == '__main__':
 	loss_func = CalculateLoss().to(device)
 	print("Setup loss function...")
 
-	start_iter = 0
-	start_epoch = 0
 	# Resume training on model
 	if args.load_model:
 		assert os.path.isfile(cwd + args.save_dir + args.load_model)
 
 		filename = cwd + args.save_dir + args.load_model
 		checkpoint_dict = torch.load(filename)
-		start_iter = checkpoint_dict["iteration"]
-		start_epoch = checkpoint_dict["epoch"]
 
 		model.load_state_dict(checkpoint_dict["model"])
 		optimizer.load_state_dict(checkpoint_dict["optimizer"])
 
-		print("Resume training on model:{} from epoch:{}, iteration:{}".format(args.load_model, start_epoch, start_iter))
+		print("Resume training on model:{}".format(args.load_model))
 
 		# Load all parameters to gpu
 		model = model.to(device)
@@ -119,17 +116,17 @@ if __name__ == '__main__':
 				if isinstance(value, torch.Tensor):
 					state[key] = value.to(device)
 
-	for epoch in range(start_epoch, args.epochs):
+	for epoch in range(0, args.epochs):
 
 		iterator_train = iter(data.DataLoader(data_train, 
 											batch_size=args.batch_size, 
 											num_workers=args.num_workers, 
-											sampler=SubsetSampler(start_iter * args.batch_size, data_size)))
+											sampler=SubsetSampler(0, data_size)))
 
 		# TRAINING LOOP
-		print("\nEPOCH:{} of {} - starting training loop from iteration:{} to iteration:{}\n".format(epoch, args.epochs, start_iter, iters_per_epoch))
+		print("\nEPOCH:{} of {} - starting training loop from iteration:0 to iteration:{}\n".format(epoch, args.epochs, iters_per_epoch))
 		
-		for i in tqdm(range(start_iter, iters_per_epoch)):
+		for i in tqdm(range(0, iters_per_epoch)):
 
 			# Sets model to train mode
 			model.train()
@@ -142,21 +139,13 @@ if __name__ == '__main__':
 
 			loss_dict = loss_func(mask, output, gt)
 			loss = 0.0
-			
-			log = ""
+
 			# sums up each loss value
 			for key, value in loss_dict.items():
 				loss += value
 				if (i + 1) % args.log_interval == 0:
 					writer.add_scalar(key, value.item(), (epoch * iters_per_epoch) + i + 1)
-					log += "{}: {}\n".format(key, value)
-
-			writer.file_writer.flush()
-
-			if log != "":
-				f = open(cwd + args.save_dir + "/loss_e{}_i{}.txt".format(epoch, i + 1))
-				f.write(log)
-				f.close()
+					writer.file_writer.flush()
 
 			# Resets gradient accumulator in optimizer
 			optimizer.zero_grad()
@@ -168,10 +157,7 @@ if __name__ == '__main__':
 			# Save model
 			if (i + 1) % args.save_interval == 0 or (i + 1) == iters_per_epoch:
 				filename = cwd + args.save_dir + "/model_e{}_i{}.pth".format(epoch, i + 1)
-				state = {"epoch": epoch, "iteration": i + 1, "model": model.state_dict(), "optimizer": optimizer.state_dict()}
+				state = {"model": model.state_dict(), "optimizer": optimizer.state_dict()}
 				torch.save(state, filename)
-
-		# Reset start iteration if model was loaded
-		start_iter = 0
 
 	writer.close()

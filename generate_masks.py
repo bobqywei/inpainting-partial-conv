@@ -13,7 +13,7 @@ def clip_bounds(n, lower, upper):
 		return n
 
 
-def random_dir(m, x, y, iterations, padding):
+def random_dir_pad(m, x, y, iterations, padding):
 	img_size = m.shape[0]
 
 	for j in range(iterations):
@@ -64,17 +64,17 @@ def random_dir(m, x, y, iterations):
 if __name__ == '__main__':
 	image_size = 256
 	num_masks = 1000
-	# dot_size = random.randint(1, 4)
+	dot_size = 2
 
 	if not os.path.exists("mask"):
 		os.makedirs("mask")
 
 	for i in range(num_masks):
 		canvas = np.ones((image_size, image_size), np.uint8)
-		startx = random.randint(50, image_size-51)
-		starty = random.randint(50, image_size-51)
-		iterations = image_size * image_size # random.randint(7000, 10000)
-		mask = random_dir(canvas, startx, starty, iterations)
+		startx = random.randint(50, image_size - 50) 
+		starty = random.randint(50, image_size - 50)
+		iterations = 4000
+		mask = random_dir_pad(canvas, startx, starty, iterations, dot_size)
 
 		print("iter: {:s}\n".format(str(i)))
 		final_image = Image.fromarray(mask * 255).convert('1')

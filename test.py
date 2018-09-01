@@ -1,6 +1,7 @@
 import argparse
 import torch
 import os
+import random
 
 from PIL import Image
 from torchvision.utils import make_grid
@@ -11,10 +12,11 @@ from partial_conv_net import PartialConvUNet
 from places2_train import unnormalize, MEAN, STDDEV
 from loss import CalculateLoss
 
+image_num = str(random.randint(1, 328501)).zfill(8)
 parser = argparse.ArgumentParser()
-parser.add_argument("--img", type=str, default="/val_256/Places365_val_00015100.jpg")
-parser.add_argument("--mask", type=str, default="/mask/mask_2.jpg")
-parser.add_argument("--model", type=str, default="/model/model_e0_i45000.pth")
+parser.add_argument("--img", type=str, default="/test_256/Places365_test_{}.jpg".format(image_num))
+parser.add_argument("--mask", type=str, default="/mask/mask_{}.png".format(random.randint(0, 12000)))
+parser.add_argument("--model", type=str, default="/model_e0_i40000.pth")
 parser.add_argument("--size", type=int, default=256)
 
 args = parser.parse_args()
@@ -47,12 +49,10 @@ with torch.no_grad():
 
 output = (mask * img) + ((1 - mask) * output)
 
-"""
-loss_func = CalculateLoss()
+"""loss_func = CalculateLoss()
 loss_out = loss_func(mask, output, gt_img)
 for key, value in loss_out.items():
-    print("KEY:{} | VALUE:{}".format(key, value))
-"""
+    print("KEY:{} | VALUE:{}".format(key, value))"""
 
-grid = make_grid(torch.cat((unnormalize(gt_img), mask, unnormalize(output)), dim=0))
+grid = make_grid(torch.cat((unnormalize(gt_img), unnormalize(img), unnormalize(output)), dim=0))
 save_image(grid, "test.jpg")
