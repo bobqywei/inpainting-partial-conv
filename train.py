@@ -137,7 +137,7 @@ if __name__ == '__main__':
 			# Mask is also propagated, though it is usually gone by the decoding stage
 			output = model(image, mask)
 
-			loss_dict = loss_func(mask, output, gt)
+			loss_dict = loss_func(image, mask, output, gt)
 			loss = 0.0
 
 			# sums up each loss value
