@@ -1,4 +1,4 @@
-# inpainting-partial-conv
+# PyTorch implementation of "Image Inpainting for Irregular Holes Using Partial Convolutions"
 
 I would like to give a BIG thank you to Dr. Liu and his team for their research: https://arxiv.org/pdf/1804.07723.pdf.
 
