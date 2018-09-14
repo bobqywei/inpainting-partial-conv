@@ -157,7 +157,7 @@ class PartialConvUNet(nn.Module):
 			encoder_key = "h_{:d}".format(i - 1)
 			decoder_key = "decoder_{:d}".format(i)
 
-			# Upsample to 2 times scale using nearest neighbor, matching dimensions of previous encoding layer output
+			# Upsample to 2 times scale, matching dimensions of previous encoding layer output
 			out_data = F.interpolate(out_data, scale_factor=2)
 			out_mask = F.interpolate(out_mask, scale_factor=2)
 

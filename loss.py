@@ -8,7 +8,7 @@ from torchvision import transforms
 from places2_train import Places2Data, MEAN, STDDEV
 from PIL import Image
 
-LAMBDAS = {"valid": 1.0, "hole": 6.0, "tv": 0.1, "perceptual": 0.05, "style": 120.0}
+LAMBDAS = {"valid": 1.0, "hole": 6.0, "tv": 2.0, "perceptual": 0.05, "style": 240.0}
 
 
 def gram_matrix(feature_matrix):
@@ -45,10 +45,9 @@ def style_loss(h_comp, h_out, h_gt, l1):
 
 
 # computes TV loss over entire composed image since gradient will not be passed backward to input
-def total_variation_loss(image):
-    # shift one pixel and get difference (for both x and y direction)
-    loss = torch.mean(torch.abs(image[:, :, :, :-1] - image[:, :, :, 1:])) + \
-           torch.mean(torch.abs(image[:, :, :-1, :] - image[:, :, 1:, :]))
+def total_variation_loss(image, l1):
+    # shift one pixel and get loss1 difference (for both x and y direction)
+    loss = l1(image[:, :, :, :-1] - image[:, :, :, 1:]) + l1(image[:, :, :-1, :] - image[:, :, 1:, :])
     return loss
 
 
@@ -78,8 +77,8 @@ class CalculateLoss(nn.Module):
 		self.vgg_extract = VGG16Extractor()
 		self.l1 = nn.L1Loss()
 
-	def forward(self, input, mask, output, ground_truth):
-		composed_output = (input * mask) + (output * (1 - mask))
+	def forward(self, input_x, mask, output, ground_truth):
+		composed_output = (input_x * mask) + (output * (1 - mask))
 
 		fs_composed_output = self.vgg_extract(composed_output)
 		fs_output = self.vgg_extract(output)
@@ -91,11 +90,12 @@ class CalculateLoss(nn.Module):
 		loss_dict["valid"] = self.l1(mask * output, mask * ground_truth) * LAMBDAS["valid"]
 		loss_dict["perceptual"] = perceptual_loss(fs_composed_output, fs_output, fs_ground_truth, self.l1) * LAMBDAS["perceptual"]
 		loss_dict["style"] = style_loss(fs_composed_output, fs_output, fs_ground_truth, self.l1) * LAMBDAS["style"]
-		loss_dict["tv"] = total_variation_loss(composed_output) * LAMBDAS["tv"]
+		loss_dict["tv"] = total_variation_loss(composed_output, self.l1) * LAMBDAS["tv"]
 
 		return loss_dict
 
 
+# Unit Test
 if __name__ == '__main__':
 	#places2 = Places2Data()
 	cwd = os.getcwd()
@@ -115,7 +115,7 @@ if __name__ == '__main__':
 	mask.unsqueeze_(0)
 	gt.unsqueeze_(0)
 
-	loss_out = loss_func(img, mask, img, gt)
+	loss_out = loss_func(mask, img, gt)
 
 	for key, value in loss_out.items():
 		print("KEY:{} | VALUE:{}".format(key, value))

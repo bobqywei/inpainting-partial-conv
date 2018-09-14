@@ -45,7 +45,7 @@ if __name__ == '__main__':
 	parser.add_argument("--fine_tune", action="store_true")
 	parser.add_argument("--gpu", type=int, default=0)
 	parser.add_argument("--num_workers", type=int, default=32)
-	parser.add_argument("--log_interval", type=int, default=50)
+	parser.add_argument("--log_interval", type=int, default=10)
 	parser.add_argument("--save_interval", type=int, default=5000)
 
 	args = parser.parse_args()
