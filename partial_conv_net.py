@@ -49,12 +49,12 @@ class PartialConvLayer (nn.Module):
 			self.activation = nn.LeakyReLU(negative_slope=0.2)
 
 	def forward(self, input_x, mask):
-		# output = W^T x (X .* M) + b
+		# output = W^T dot (X .* M) + b
 		output = self.input_conv(input_x * mask)
 
 		# requires_grad = False
 		with torch.no_grad():
-			# mask = (1 .* M) + 0 = M
+			# mask = (1 dot M) + 0 = M
 			output_mask = self.mask_conv(mask)
 
 		if self.input_conv.bias is not None:
@@ -65,10 +65,11 @@ class PartialConvLayer (nn.Module):
 
 		# mask_sum is the sum of the binary mask at every partial convolution location
 		mask_is_zero = (output_mask == 0)
+		# temporarily sets zero values to one to ease output calculation 
 		mask_sum = output_mask.masked_fill_(mask_is_zero, 1.0)
 
 		# output at each location as follows:
-		# output = (W^T x (X .* M) + b - b) / M_sum + b ; if M_sum > 0
+		# output = (W^T dot (X .* M) + b - b) / M_sum + b ; if M_sum > 0
 		# output = 0 ; if M_sum == 0
 		output = (output - output_bias) / mask_sum + output_bias
 		output = output.masked_fill_(mask_is_zero, 0.0)
@@ -145,6 +146,7 @@ class PartialConvUNet(nn.Module):
 		for i in range(1, self.layers + 1):
 			encoder_key = "encoder_{:d}".format(i)
 			key = "h_{:d}".format(i)
+			# Passes input and mask through encoding layer
 			encoder_dict[key], mask_dict[key] = getattr(self, encoder_key)(encoder_dict[key_prev], mask_dict[key_prev])
 			key_prev = key
 
@@ -162,6 +164,7 @@ class PartialConvUNet(nn.Module):
 			out_mask = F.interpolate(out_mask, scale_factor=2)
 
 			# concatenate upsampled decoder output with encoder output of same H x W dimensions
+			# s.t. final decoding layer input will contain the original image
 			out_data = torch.cat([out_data, encoder_dict[encoder_key]], dim=1)
 			# also concatenate the masks
 			out_mask = torch.cat([out_mask, mask_dict[encoder_key]], dim=1)
@@ -176,7 +179,7 @@ class PartialConvUNet(nn.Module):
 		if self.freeze_enc_bn:
 			for name, module in self.named_modules():
 				if isinstance(module, nn.BatchNorm2d) and "enc" in name:
-					# Sets batch normalization layer to evaluation mode
+					# Sets batch normalization layers to evaluation mode
 					module.eval()
 
 

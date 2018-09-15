@@ -13,7 +13,6 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 
-from PIL import Image
 from torchvision.utils import make_grid
 from torchvision.utils import save_image
 from torchvision import transforms
@@ -116,19 +115,23 @@ class InpaintApp(QWidget):
 
         mask.save("mask.png", "png")
 
+        # open image and normalize before forward pass
         mask = Image.open(self.cwd + "/mask.png")
         mask = self.mask_transform(mask.convert("RGB"))
         gt_img = Image.open(self.save_path)
         gt_img = self.img_transform(gt_img.convert("RGB"))
         img = gt_img * mask
 
+        # adds dimension of 1 (batch) to image
         img.unsqueeze_(0)
         gt_img.unsqueeze_(0)
         mask.unsqueeze_(0)
 
+        # forward pass
         with torch.no_grad():
             output = self.model(img.to(self.device), mask.to(self.device))
 
+        # unnormalize the image and output
         output = mask * img + (1 - mask) * output
         grid = make_grid(unnormalize(output))
         save_image(grid, "test.jpg")

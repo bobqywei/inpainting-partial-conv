@@ -7,10 +7,12 @@ from PIL import Image
 from torchvision import transforms
 from torchvision import utils
 
+# mean and std channel values for places2 dataset
 MEAN = [0.485, 0.456, 0.406]
 STDDEV = [0.229, 0.224, 0.225]
 
 
+# reverses the earlier normalization applied to the image to prepare output
 def unnormalize(x):
 	x.transpose_(1, 3)
 	x = x * torch.Tensor(STDDEV) + torch.Tensor(MEAN)
@@ -28,6 +30,7 @@ class Places2Data (torch.utils.data.Dataset):
 		self.num_masks = len(self.mask_paths)
 		self.num_imgs = len(self.img_paths)
 
+		# normalizes the image: (img - MEAN) / STD and converts to tensor
 		self.img_transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize(MEAN, STDDEV)])
 		self.mask_transform = transforms.ToTensor()
 
@@ -48,7 +51,7 @@ class Places2Data (torch.utils.data.Dataset):
 if __name__ == '__main__':
 	places2 = Places2Data()
 	print(len(places2))
-	img, mask, gt = zip(*[places2[i] for i in range(1)]) # returns tuple of 3x256x256 images
+	img, mask, gt = zip(*[places2[i] for i in range(1)]) # returns tuple of a single batch of 3x256x256 images
 	img = torch.stack(img) # --> i x 3 x 256 x 256
 	i = img == 0
 	print(i.sum())

@@ -63,6 +63,7 @@ class VGG16Extractor(nn.Module):
 			for param in getattr(self, 'max_pooling{:d}'.format(i)).parameters():
 				param.requires_grad = False
 
+	# feature extractor at each of the first three pooling layers
 	def forward(self, image):
 		results = [image]
 		for i in range(1, 4):
@@ -97,7 +98,6 @@ class CalculateLoss(nn.Module):
 
 # Unit Test
 if __name__ == '__main__':
-	#places2 = Places2Data()
 	cwd = os.getcwd()
 	loss_func = CalculateLoss()
 
